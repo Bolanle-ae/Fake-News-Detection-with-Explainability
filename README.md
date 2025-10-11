@@ -72,8 +72,3 @@ After loading, a binary label is added:
 
 6. **Explainability with LIME**  
    LIME highlights the most influential words that led to the model’s decision, increasing interpretability.
-
----
-
-## 🧠 Example Output
-
