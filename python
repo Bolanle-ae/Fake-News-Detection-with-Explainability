@@ -1,0 +1,66 @@
+import pandas as pd
+import pandas as pd
+import numpy as np
+import re, string, torch
+from sklearn.model_selection import train_test_split
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from lime.lime_text import LimeTextExplainer
+
+# Dataset
+df1 = pd.read_csv('/content/Fake.csv', engine='python', on_bad_lines='skip')
+df2 = pd.read_csv('/content/True.csv', engine='python', on_bad_lines='skip')
+
+df1['label']=0
+df2['label']=1
+
+display(df1.head())
+display(df2.head())
+
+# Clean text
+
+def clean_text(text):
+    text = text.lower()
+    text = re.sub(r"http\S+", " ", text)
+    text = re.sub(r"\d+", " ", text)
+    text = text.translate(str.maketrans("", "", string.punctuation))
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+df['content'] = (df['title'] + ' ' + df['text'] + ' ' + df['subject']).apply(clean_text)
+
+X_train, X_test, y_train, y_test = train_test_split(
+    df['content'], df['label'], test_size=0.2, random_state=42
+)
+
+# Load pretrained BERT
+
+model_name = "bert-base-uncased"
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2)
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model.to(device).eval()
+
+class_names = ["Fake News", "Real News"]
+
+def predict_proba(texts):
+    enc = tokenizer(list(texts), return_tensors="pt", truncation=True, padding=True).to(device)
+    with torch.no_grad():
+        logits = model(**enc).logits
+    return torch.softmax(logits, -1).cpu().numpy()
+
+def predict_news(text):
+    probs = predict_proba([clean_text(text)])[0]
+    return class_names[np.argmax(probs)]
+
+print("\nTest prediction:")
+print(predict_news("Donald Trump sends shocking news on New Year’s Eve"))
+
+# LIME explainability
+
+explainer = LimeTextExplainer(class_names=class_names)
+
+sample_text = X_test.iloc[0]
+print("\nExplaining:", sample_text[:200], "...")
+
+exp = explainer.explain_instance(sample_text, predict_proba, num_features=10, num_samples=50)
+exp.show_in_notebook(text=sample_text)
