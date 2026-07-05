@@ -220,9 +220,7 @@ if analyse_clicked:
     with meter_col:
         import pandas as pd
 
-        chart_data = pd.DataFrame(
-            {"Class": CLASS_NAMES, "Probability": probs}
-        ).set_index("Class")
+        chart_data = pd.DataFrame([probs], columns=CLASS_NAMES, index=["Probability"])
         st.bar_chart(
             chart_data,
             height=180,
