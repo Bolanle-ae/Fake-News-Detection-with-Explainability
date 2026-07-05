@@ -1,20 +1,23 @@
-import pandas as pd
-import pandas as pd
+import re
+import string
 import numpy as np
-import re, string, torch
+import pandas as pd
+import torch
 from sklearn.model_selection import train_test_split
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from lime.lime_text import LimeTextExplainer
 
 # Dataset
-df1 = pd.read_csv('/content/Fake.csv', engine='python', on_bad_lines='skip')
-df2 = pd.read_csv('/content/True.csv', engine='python', on_bad_lines='skip')
+df1 = pd.read_csv('data/Fake.csv', engine='python', on_bad_lines='skip')
+df2 = pd.read_csv('data/True.csv', engine='python', on_bad_lines='skip')
 
-df1['label']=0
-df2['label']=1
+df1['label'] = 0
+df2['label'] = 1
 
-display(df1.head())
-display(df2.head())
+print(df1.head())
+print(df2.head())
+
+df = pd.concat([df1, df2], ignore_index=True)
 
 # Clean text
 
@@ -43,7 +46,9 @@ model.to(device).eval()
 class_names = ["Fake News", "Real News"]
 
 def predict_proba(texts):
-    enc = tokenizer(list(texts), return_tensors="pt", truncation=True, padding=True).to(device)
+    enc = tokenizer(
+        list(texts), return_tensors="pt", truncation=True, padding=True, max_length=256
+    ).to(device)
     with torch.no_grad():
         logits = model(**enc).logits
     return torch.softmax(logits, -1).cpu().numpy()
@@ -55,6 +60,23 @@ def predict_news(text):
 print("\nTest prediction:")
 print(predict_news("Donald Trump sends shocking news on New Year’s Eve"))
 
+# Zero-shot accuracy on a sample of the held-out test set
+# (bert-base-uncased here is not fine-tuned on this dataset, so this is a
+# baseline reading, not a trained model's accuracy).
+sample_n = min(200, len(X_test))
+X_sample = X_test.sample(n=sample_n, random_state=42)
+y_sample = y_test.loc[X_sample.index]
+
+batch_size = 16
+preds = []
+for start in range(0, len(X_sample), batch_size):
+    batch_texts = X_sample.iloc[start:start + batch_size].tolist()
+    probs = predict_proba(batch_texts)
+    preds.extend(np.argmax(probs, axis=1).tolist())
+
+accuracy = (np.array(preds) == y_sample.to_numpy()).mean()
+print(f"\nZero-shot accuracy on {sample_n}-article sample: {accuracy:.1%}")
+
 # LIME explainability
 
 explainer = LimeTextExplainer(class_names=class_names)
@@ -63,4 +85,6 @@ sample_text = X_test.iloc[0]
 print("\nExplaining:", sample_text[:200], "...")
 
 exp = explainer.explain_instance(sample_text, predict_proba, num_features=10, num_samples=50)
-exp.show_in_notebook(text=sample_text)
+exp.save_to_file('lime_explanation.html')
+print("\nLIME explanation saved to lime_explanation.html")
+print(exp.as_list())
