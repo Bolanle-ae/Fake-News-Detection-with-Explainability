@@ -1,3 +1,13 @@
+---
+title: Fake News Detection With Explainability
+emoji: 📰
+colorFrom: purple
+colorTo: pink
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # 📰 Fake News Detection with Explainable AI (BERT + LIME)
 
 This project uses **Natural Language Processing (NLP)** and **Explainable AI (XAI)** to detect fake news articles and explain the model’s predictions.  
